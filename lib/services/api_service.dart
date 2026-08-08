@@ -363,18 +363,21 @@ class ApiService {
 
     final baseUrl = provider.baseUrl.replaceFirst(RegExp(r'/$'), '');
     final endpoints = <String>[
+      // OpenAI Dashboard 余额接口 (MetaAPI 等兼容)
+      '$baseUrl/v1/dashboard/billing/subscription',
+      '$baseUrl/v1/dashboard/billing/usage',
       // LinksAPI / New-API 兼容余额接口
       '$baseUrl/v1/billing/usage?type=token&unit=usd',
       '$baseUrl/v1/billing/usage',
       // 其他常见中转站接口
       '$baseUrl/v1/balance',
       '$baseUrl/v1/credits',
-      '$baseUrl/api/user/self',
-      '$baseUrl/v1/dashboard/billing/subscription',
-      '$baseUrl/v1/dashboard/billing/usage',
     ];
 
     final errors = <String>[];
+    double? subscriptionLimit;
+    double? totalUsage;
+
     for (final url in endpoints) {
       try {
         final response = await http.get(
@@ -386,15 +389,56 @@ class ApiService {
         ).timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
+          final path = Uri.parse(url).path;
+
+          // 处理 dashboard/billing/subscription 响应
+          if (path.contains('subscription')) {
+            try {
+              final json = jsonDecode(response.body) as Map<String, dynamic>;
+              final softLimit = json['soft_limit_usd'];
+              if (softLimit is num) {
+                subscriptionLimit = softLimit.toDouble();
+              }
+            } catch (_) {}
+          }
+
+          // 处理 dashboard/billing/usage 响应
+          if (path.contains('/usage')) {
+            try {
+              final json = jsonDecode(response.body) as Map<String, dynamic>;
+              final usage = json['total_usage'];
+              if (usage is num) {
+                totalUsage = usage.toDouble() / 100.0; // 美分转美元
+              }
+            } catch (_) {}
+          }
+
+          // 尝试解析标准余额格式
           final balance = _parseBalanceResponse(response.body);
           if (!balance.isEmpty) return balance;
-          errors.add('${Uri.parse(url).path}: 响应未包含余额字段');
         } else {
           errors.add('${Uri.parse(url).path}: HTTP ${response.statusCode}');
         }
       } catch (e) {
         errors.add('${Uri.parse(url).path}: ${e.toString()}');
       }
+    }
+
+    // 如果通过 dashboard 端点获取到了订阅和用量信息
+    if (subscriptionLimit != null) {
+      final usage = totalUsage ?? 0.0;
+      return BalanceInfo(
+        totalBalance: subscriptionLimit,
+        usedBalance: usage,
+        remainingBalance: subscriptionLimit - usage,
+        currency: 'USD',
+      );
+    }
+
+    // 如果所有端点都返回了 404，说明该商家不支持余额查询
+    if (errors.every((e) => e.contains('HTTP 404'))) {
+      throw Exception(
+          '${provider.name} 不支持余额查询接口。\nAPI Key 已验证有效，请前往商家网站查看余额。');
     }
 
     throw Exception(
