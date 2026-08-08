@@ -35,6 +35,33 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Patch Gradle for plugin compatibility
+        run: |
+          # Fix namespace issue for plugins that don't define it (AGP 8+ compat)
+          cat >> android/build.gradle << 'GRADLE_PATCH'
+
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty('android')) {
+                      if (project.android.namespace == null) {
+                          def manifest = new File(project.projectDir, 'src/main/AndroidManifest.xml')
+                          if (manifest.exists()) {
+                              def parsed = new XmlParser().parse(manifest)
+                              def packageName = parsed.@package
+                              if (packageName) {
+                                  project.android.namespace = packageName
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          GRADLE_PATCH
+
+          # Update compileSdkVersion to 35
+          sed -i 's/compileSdk = .*/compileSdk = 35/' android/app/build.gradle
+          sed -i 's/compileSdkVersion .*/compileSdkVersion 35/' android/app/build.gradle
+
       - name: Build APK
         run: flutter build apk --release
 
