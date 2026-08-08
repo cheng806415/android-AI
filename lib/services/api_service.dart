@@ -181,7 +181,7 @@ class ApiService {
       'size': config.size,
       'quality': config.quality,
       'n': config.count,
-      'response_format': 'url',
+      'response_format': {'type': 'url'},
     };
 
     try {
