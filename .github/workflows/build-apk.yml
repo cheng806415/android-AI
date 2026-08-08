@@ -35,30 +35,25 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Patch Gradle for plugin compatibility
+      - name: Patch plugins for AGP 8+ compatibility
         run: |
-          # Fix namespace issue for plugins that don't define it (AGP 8+ compat)
-          cat >> android/build.gradle << 'GRADLE_PATCH'
+          # Fix namespace issue for any plugin missing it (AGP 8+ compat)
+          for plugin_dir in android/.symlinks/plugins/*/android; do
+            if [ -f "$plugin_dir/build.gradle" ]; then
+              if ! grep -q "namespace" "$plugin_dir/build.gradle"; then
+                manifest="$plugin_dir/src/main/AndroidManifest.xml"
+                if [ -f "$manifest" ]; then
+                  pkg=$(grep -oP 'package="\K[^"]+' "$manifest" || true)
+                  if [ -n "$pkg" ]; then
+                    sed -i "/^android {/a\\    namespace '$pkg'" "$plugin_dir/build.gradle"
+                    echo "Patched namespace '$pkg' in $plugin_dir/build.gradle"
+                  fi
+                fi
+              fi
+            fi
+          done
 
-          subprojects {
-              afterEvaluate { project ->
-                  if (project.hasProperty('android')) {
-                      if (project.android.namespace == null) {
-                          def manifest = new File(project.projectDir, 'src/main/AndroidManifest.xml')
-                          if (manifest.exists()) {
-                              def parsed = new XmlParser().parse(manifest)
-                              def packageName = parsed.@package
-                              if (packageName) {
-                                  project.android.namespace = packageName
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-          GRADLE_PATCH
-
-          # Update compileSdkVersion to 35
+          # Ensure compileSdkVersion is 35
           sed -i 's/compileSdk = .*/compileSdk = 35/' android/app/build.gradle
           sed -i 's/compileSdkVersion .*/compileSdkVersion 35/' android/app/build.gradle
 

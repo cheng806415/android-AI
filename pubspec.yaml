@@ -25,7 +25,7 @@ dependencies:
 
   # Image
   image_picker: ^1.0.7
-  image_gallery_saver: ^2.0.3
+
   cached_network_image: ^3.3.1
 
   # Utils
