@@ -361,30 +361,44 @@ class ApiService {
       throw Exception('${provider.name} 的 API Key 未配置');
     }
 
-    final endpoints = [
-      '/v1/balance',
-      '/v1/dashboard/billing/subscription',
-      '/v1/dashboard/billing/usage',
-      '/v1/credits',
+    final baseUrl = provider.baseUrl.replaceFirst(RegExp(r'/$'), '');
+    final endpoints = <String>[
+      // LinksAPI / New-API 兼容余额接口
+      '$baseUrl/v1/billing/usage?type=token&unit=usd',
+      '$baseUrl/v1/billing/usage',
+      // 其他常见中转站接口
+      '$baseUrl/v1/balance',
+      '$baseUrl/v1/credits',
+      '$baseUrl/api/user/self',
+      '$baseUrl/v1/dashboard/billing/subscription',
+      '$baseUrl/v1/dashboard/billing/usage',
     ];
 
-    for (final endpoint in endpoints) {
+    final errors = <String>[];
+    for (final url in endpoints) {
       try {
-        final url = '${provider.baseUrl}$endpoint';
         final response = await http.get(
           Uri.parse(url),
-          headers: {'Authorization': 'Bearer ${provider.apiKey}'},
+          headers: {
+            'Authorization': 'Bearer ${provider.apiKey}',
+            'Accept': 'application/json',
+          },
         ).timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
-          return _parseBalanceResponse(response.body);
+          final balance = _parseBalanceResponse(response.body);
+          if (!balance.isEmpty) return balance;
+          errors.add('${Uri.parse(url).path}: 响应未包含余额字段');
+        } else {
+          errors.add('${Uri.parse(url).path}: HTTP ${response.statusCode}');
         }
-      } catch (_) {
-        continue;
+      } catch (e) {
+        errors.add('${Uri.parse(url).path}: ${e.toString()}');
       }
     }
 
-    throw Exception('无法获取余额信息，该商家可能不支持余额查询');
+    throw Exception(
+        '无法获取 ${provider.name} 余额。请确认 Base URL、API Key 和商家余额接口；\n${errors.take(3).join('\n')}');
   }
 
   // ========== 响应解析 ==========
@@ -569,32 +583,37 @@ class ApiService {
     try {
       final json = jsonDecode(body) as Map<String, dynamic>;
 
-      if (json.containsKey('data')) {
-        final data = json['data'] as Map<String, dynamic>;
-        final total = (data['balance'] ?? data['total_balance'] ?? 0).toDouble();
-        final used = (data['used'] ?? data['used_balance'] ?? 0).toDouble();
+      dynamic value(dynamic input) {
+        if (input is num) return input.toDouble();
+        if (input is String) return double.tryParse(input);
+        return null;
+      }
+
+      final rawData = json['data'];
+      final data = rawData is Map<String, dynamic> ? rawData : <String, dynamic>{};
+      final rawUser = data['user'];
+      final user = rawUser is Map<String, dynamic> ? rawUser : <String, dynamic>{};
+
+      final total = value(data['balance']) ??
+          value(data['total_balance']) ??
+          value(data['quota']) ??
+          value(user['quota']) ??
+          value(json['balance']) ??
+          value(json['remaining']);
+      final used = value(data['used']) ??
+          value(data['used_balance']) ??
+          value(data['used_quota']) ??
+          value(user['used_quota']) ??
+          value(json['used']) ??
+          0.0;
+
+      if (total != null) {
+        final remaining = value(data['remaining']) ?? (total - used);
         return BalanceInfo(
           totalBalance: total,
           usedBalance: used,
-          remainingBalance: total - used,
-        );
-      }
-
-      if (json.containsKey('balance')) {
-        final balance = (json['balance'] as num).toDouble();
-        return BalanceInfo(
-          totalBalance: balance,
-          usedBalance: 0,
-          remainingBalance: balance,
-        );
-      }
-
-      if (json.containsKey('remaining')) {
-        final remaining = (json['remaining'] as num).toDouble();
-        return BalanceInfo(
-          totalBalance: remaining,
-          usedBalance: 0,
           remainingBalance: remaining,
+          currency: (data['currency'] ?? json['currency'] ?? 'USD').toString(),
         );
       }
 
