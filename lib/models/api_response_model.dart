@@ -210,6 +210,9 @@ class BalanceInfo {
     this.currency = 'USD',
   });
 
+  bool get isEmpty =>
+      totalBalance == 0 && usedBalance == 0 && remainingBalance == 0;
+
   factory BalanceInfo.empty() {
     return const BalanceInfo(
       totalBalance: 0,
