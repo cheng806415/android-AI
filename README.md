@@ -7,10 +7,10 @@ AI 图片生成器是一个 Flutter 应用，支持 Android、Windows 和 macOS�
 | 平台 | 架构 | 分发方式 | 状态 |
 | --- | --- | --- | --- |
 | Android | ARM/ARM64 | 官网服务器 APK | 当前支持 |
-| Windows | x86-64（AMD64） | GitHub Releases | 适配中 |
+| Windows | x86-64（AMD64） | GitHub Releases | 当前支持 |
 | Windows | ARM64（Windows on ARM） | GitHub Releases | 适配中 |
-| macOS | ARM64（Apple Silicon） | GitHub Releases | 适配中 |
-| macOS | x86-64（Intel） | GitHub Releases | 适配中 |
+| macOS | ARM64（Apple Silicon） | GitHub Releases | 当前支持 |
+| macOS | x86-64（Intel） | GitHub Releases | 当前支持 |
 | Linux | 暂无 | 不提供下载 | 暂不开发 |
 
 Android 保持本地 Flutter Release 构建，并通过官网服务器提供更新。Windows 和 macOS 使用 GitHub Actions 构建，正式下载入口统一使用 GitHub Releases。
