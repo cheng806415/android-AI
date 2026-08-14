@@ -1,12 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/image_model.dart';
 import '../models/generation_config.dart';
+import '../providers/history_provider.dart';
+import '../services/storage_service.dart';
 import 'package:intl/intl.dart';
 
-/// 图片详情页面 - 全屏查看、分享、查看参数
+/// 图片详情页面 - 全屏查看、分享、收藏、再次生成
 class ImageDetailScreen extends StatefulWidget {
   final GeneratedImage image;
 
@@ -18,11 +21,18 @@ class ImageDetailScreen extends StatefulWidget {
 
 class _ImageDetailScreenState extends State<ImageDetailScreen> {
   bool _showInfo = false;
+  late GeneratedImage _image;
+
+  @override
+  void initState() {
+    super.initState();
+    _image = widget.image;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final file = File(widget.image.localPath);
+    final file = File(_image.localPath);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -31,10 +41,24 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          // 收藏按钮
+          IconButton(
+            icon: Icon(
+              _image.isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _image.isFavorite ? Colors.red[300] : null,
+            ),
+            onPressed: _toggleFavorite,
+            tooltip: _image.isFavorite ? '取消收藏' : '收藏',
+          ),
           IconButton(
             icon: Icon(_showInfo ? Icons.info : Icons.info_outline),
             onPressed: () => setState(() => _showInfo = !_showInfo),
             tooltip: '图片信息',
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: _editMetadata,
+            tooltip: '编辑作品信息',
           ),
           IconButton(
             icon: const Icon(Icons.share),
@@ -52,6 +76,16 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
                     Icon(Icons.save_alt, size: 20),
                     SizedBox(width: 8),
                     Text('保存到相册'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'regenerate',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(width: 8),
+                    Text('使用此配置再次创作'),
                   ],
                 ),
               ),
@@ -90,12 +124,20 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
             ),
           ),
 
+          // 底部操作栏
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomBar(theme),
+          ),
+
           // 信息面板
           if (_showInfo)
             Positioned(
               left: 0,
               right: 0,
-              bottom: 0,
+              bottom: 60,
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -126,9 +168,19 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
                         children: [
                           _buildInfoChip(
                             '模型',
-                            GenerationConfig.modelDisplayName(
-                                widget.image.model),
+                            GenerationConfig.modelDisplayName(_image.model),
                           ),
+                          _buildInfoChip('标题',
+                              _image.title.isEmpty ? '未设置' : _image.title),
+                          _buildInfoChip(
+                              '分类',
+                              _image.category.isEmpty
+                                  ? '未分类'
+                                  : _image.category),
+                          if (_image.tags.isNotEmpty)
+                            _buildInfoChip('标签', _image.tags.join('、')),
+                          if (_image.notes.isNotEmpty)
+                            _buildInfoChip('备注', _image.notes),
                           _buildInfoChip('尺寸', widget.image.size),
                           _buildInfoChip('质量', widget.image.quality),
                           if (widget.image.generationTimeMs > 0)
@@ -149,6 +201,47 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.7),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            // 收藏按钮
+            TextButton.icon(
+              onPressed: _toggleFavorite,
+              icon: Icon(
+                widget.image.isFavorite
+                    ? Icons.favorite
+                    : Icons.favorite_border,
+                size: 18,
+                color: _image.isFavorite ? Colors.red[300] : Colors.white70,
+              ),
+              label: Text(
+                widget.image.isFavorite ? '已收藏' : '收藏',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+            const Spacer(),
+            // 再次生成按钮
+            ElevatedButton.icon(
+              onPressed: _regenerate,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('再次生成'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -177,6 +270,94 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
     );
   }
 
+  Future<void> _editMetadata() async {
+    final titleController = TextEditingController(text: _image.title);
+    final categoryController = TextEditingController(text: _image.category);
+    final tagsController = TextEditingController(text: _image.tags.join(', '));
+    final notesController = TextEditingController(text: _image.notes);
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('编辑作品信息'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: '标题')),
+              TextField(
+                  controller: categoryController,
+                  decoration: const InputDecoration(labelText: '分类')),
+              TextField(
+                  controller: tagsController,
+                  decoration: const InputDecoration(labelText: '标签，用逗号分隔')),
+              TextField(
+                  controller: notesController,
+                  decoration: const InputDecoration(labelText: '备注'),
+                  maxLines: 3),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, {
+              'title': titleController.text,
+              'category': categoryController.text,
+              'tags': tagsController.text,
+              'notes': notesController.text,
+            }),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    titleController.dispose();
+    categoryController.dispose();
+    tagsController.dispose();
+    notesController.dispose();
+    if (result == null || !mounted) return;
+    final tags = (result['tags'] ?? '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toSet()
+        .toList();
+    await context.read<HistoryProvider>().updateMetadata(
+          _image,
+          title: result['title'] ?? '',
+          category: result['category'] ?? '',
+          tags: tags,
+          notes: result['notes'] ?? '',
+        );
+    if (!mounted) return;
+    setState(() {
+      _image = _image.copyWith(
+        title: result['title'],
+        category: result['category'],
+        tags: tags,
+        notes: result['notes'],
+      );
+    });
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('作品信息已保存')));
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (!mounted) return;
+    await context.read<HistoryProvider>().toggleFavorite(_image.id);
+    if (mounted) {
+      setState(() => _image = _image.copyWith(isFavorite: !_image.isFavorite));
+    }
+  }
+
+  /// 返回完整生成配置，让首页恢复本次创作参数。
+  void _regenerate() {
+    Navigator.pop(context, widget.image.generationConfig);
+  }
+
   Future<void> _shareImage(File file) async {
     try {
       await Share.shareXFiles(
@@ -195,16 +376,37 @@ class _ImageDetailScreenState extends State<ImageDetailScreen> {
     }
   }
 
-  void _handleMenuAction(String action, File file) {
-    switch (action) {
-      case 'save':
-        // 图片已经在本地，可以提示用户已保存
+  Future<void> _saveToAlbum(File file) async {
+    try {
+      final storageService = context.read<StorageService>();
+      final result = await storageService.saveToDcim(file.path);
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('图片已保存在应用目录中'),
+          SnackBar(
+            content: Text(result.isNotEmpty ? '已保存到相册: $result' : '已保存到相册'),
             backgroundColor: Colors.green,
           ),
         );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('保存到相册失败: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleMenuAction(String action, File file) {
+    switch (action) {
+      case 'save':
+        _saveToAlbum(file);
+        break;
+      case 'regenerate':
+        _regenerate();
         break;
       case 'copy_prompt':
         Clipboard.setData(ClipboardData(text: widget.image.prompt));

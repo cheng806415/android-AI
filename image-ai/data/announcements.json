@@ -1,0 +1,24 @@
+[
+    {
+        "id": "ann_cross_platform_20260814",
+        "title": "跨平台适配开发公告",
+        "content": "我们已启动 Windows 和 macOS 版本适配开发：Windows 将支持 x86-64（AMD64）和 ARM64（Windows on ARM）；macOS 将继续支持 ARM64（Apple Silicon），并补充 x86-64（Intel）旧机型支持。Android 继续采用本地构建并通过服务器提供更新。Linux 目前暂不在开发计划内。开发期间，Windows 和 macOS 构建将通过 GitHub Actions 发布，官网将按系统提供对应下载入口。",
+        "type": "info",
+        "enabled": true,
+        "pinned": true,
+        "created_at": "2026-08-14 18:00:00",
+        "updated_at": "2026-08-14 18:00:00",
+        "expires_at": null
+    },
+    {
+        "id": "ann_welcome",
+        "title": "欢迎使用 AI 图片生成器",
+        "content": "感谢您的使用！当前版本已支持 VPS IP 直连，更新服务更加稳定。如有问题请通过应用内反馈。",
+        "type": "info",
+        "enabled": true,
+        "pinned": false,
+        "created_at": "2026-08-13 10:00:00",
+        "updated_at": "2026-08-13 10:00:00",
+        "expires_at": null
+    }
+]

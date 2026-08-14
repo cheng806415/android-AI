@@ -137,8 +137,7 @@ class ProviderSelector extends StatelessWidget {
                                 Wrap(
                                   spacing: 4,
                                   children: provider.supportedEndpoints
-                                      .map((ep) => _buildEndpointTag(
-                                          theme, ep))
+                                      .map((ep) => _buildEndpointTag(theme, ep))
                                       .toList(),
                                 ),
                               ],

@@ -34,3 +34,9 @@ Thumbs.db
 # Misc
 *.log
 *.tmp
+
+# Local toolchains and helper binaries
+toolchains/
+tools/lanzou/
+verify_dns.ps1
+管理员账号密码.txt

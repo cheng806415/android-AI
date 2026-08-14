@@ -1,0 +1,111 @@
+name: Build Desktop Releases
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'windows/**'
+      - 'macos/**'
+      - '.github/workflows/build-desktop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            arch: x86-64
+            runner: windows-2022
+            build_dir: x64
+          - platform: windows
+            arch: ARM64
+            runner: windows-11-arm
+            build_dir: arm64
+          - platform: macos
+            arch: x86-64
+            runner: macos-13
+          - platform: macos
+            arch: ARM64
+            runner: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable desktop target
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            flutter config --enable-windows-desktop
+          else
+            flutter config --enable-macos-desktop
+          fi
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build desktop application
+        run: flutter build ${{ matrix.platform }} --release
+
+      - name: Verify Windows architecture output
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $releaseDir = "build\windows\${{ matrix.build_dir }}\runner\Release"
+          if (-not (Test-Path $releaseDir)) {
+            throw "Windows release directory was not found: $releaseDir"
+          }
+          if (-not (Get-ChildItem -Path $releaseDir -File -Recurse)) {
+            throw "Windows release directory is empty: $releaseDir"
+          }
+
+      - name: Verify macOS application
+        if: matrix.platform == 'macos'
+        run: test -d "build/macos/Build/Products/Release/ai_image_generator.app"
+
+      - name: Package Windows application
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $releaseDir = "build\windows\${{ matrix.build_dir }}\runner\Release\*"
+          $archive = "build\ai-image-generator-windows-${{ matrix.arch }}.zip"
+          Compress-Archive -Path $releaseDir -DestinationPath $archive
+
+      - name: Package macOS application
+        if: matrix.platform == 'macos'
+        run: ditto -c -k --sequesterRsrc --keepParent "build/macos/Build/Products/Release/ai_image_generator.app" "build/ai-image-generator-macos-${{ matrix.arch }}.zip"
+
+      - name: Generate checksum
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            sha256sum "build/ai-image-generator-windows-${{ matrix.arch }}.zip" > "build/ai-image-generator-windows-${{ matrix.arch }}.sha256"
+          else
+            shasum -a 256 "build/ai-image-generator-macos-${{ matrix.arch }}.zip" > "build/ai-image-generator-macos-${{ matrix.arch }}.sha256"
+          fi
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-image-generator-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            build/*.zip
+            build/*.sha256
+          if-no-files-found: error
+          retention-days: 30

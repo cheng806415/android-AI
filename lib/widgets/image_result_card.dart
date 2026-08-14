@@ -9,12 +9,14 @@ class ImageResultCard extends StatelessWidget {
   final GeneratedImage image;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onFavorite;
 
   const ImageResultCard({
     super.key,
     required this.image,
     this.onTap,
     this.onDelete,
+    this.onFavorite,
   });
 
   @override
@@ -32,27 +34,59 @@ class ImageResultCard extends StatelessWidget {
             // 图片预览
             AspectRatio(
               aspectRatio: 1,
-              child: file.existsSync()
-                  ? Image.file(
-                      file,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        child: Icon(
-                          Icons.broken_image,
-                          size: 48,
-                          color: theme.colorScheme.onSurface.withOpacity(0.3),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  file.existsSync()
+                      ? Image.file(
+                          file,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 48,
+                              color:
+                                  theme.colorScheme.onSurface.withOpacity(0.3),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.image_not_supported,
+                            size: 48,
+                            color: theme.colorScheme.onSurface.withOpacity(0.3),
+                          ),
+                        ),
+                  // 收藏按钮
+                  if (onFavorite != null)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Material(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: onFavorite,
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Icon(
+                              image.isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 18,
+                              color: image.isFavorite
+                                  ? Colors.red[300]
+                                  : Colors.white70,
+                            ),
+                          ),
                         ),
                       ),
-                    )
-                  : Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Icon(
-                        Icons.image_not_supported,
-                        size: 48,
-                        color: theme.colorScheme.onSurface.withOpacity(0.3),
-                      ),
                     ),
+                ],
+              ),
             ),
             // 信息区域
             Padding(
@@ -69,13 +103,14 @@ class ImageResultCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      _buildTag(theme, GenerationConfig.modelDisplayName(image.model)),
+                      _buildTag(theme,
+                          GenerationConfig.modelDisplayName(image.model)),
                       const SizedBox(width: 6),
                       _buildTag(theme, image.size),
                       if (image.generationTimeMs > 0) ...[
                         const SizedBox(width: 6),
-                        _buildTag(
-                            theme, '${(image.generationTimeMs / 1000).toStringAsFixed(1)}s'),
+                        _buildTag(theme,
+                            '${(image.generationTimeMs / 1000).toStringAsFixed(1)}s'),
                       ],
                       const Spacer(),
                       if (onDelete != null)

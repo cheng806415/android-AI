@@ -107,6 +107,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get notificationsEnabled => _service.notificationsEnabled;
+
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    await _service.setNotificationsEnabled(enabled);
+    notifyListeners();
+  }
+
   // ========== 初始化 ==========
   Future<void> init() async {
     await _service.init();

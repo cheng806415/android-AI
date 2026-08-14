@@ -1,10 +1,20 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/api_response_model.dart';
 import '../models/generation_config.dart';
+
 import '../providers/settings_provider.dart';
+import '../providers/update_provider.dart';
 import '../services/api_service.dart';
+import '../services/storage_service.dart';
 import '../widgets/provider_selector.dart';
+import '../widgets/update_dialog.dart';
+import 'update_diagnostics_screen.dart';
 
 /// 设置页面
 class SettingsScreen extends StatefulWidget {
@@ -54,63 +64,182 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(8),
             children: [
-              // 商家管理
-              _buildSectionHeader(theme, 'API 商家管理'),
-              const SizedBox(height: 8),
-              ...settings.providers.map((p) =>
-                  _buildProviderCard(theme, settings, p)),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _saveAllKeys(settings),
-                  icon: const Icon(Icons.save, size: 18),
-                  label: const Text('保存所有密钥'),
-                ),
+              // 一级：API 配置
+              _buildCategory(
+                theme,
+                icon: Icons.cloud,
+                title: 'API 配置',
+                children: [
+                  _buildSubSection(
+                    theme,
+                    title: '商家管理',
+                    children: [
+                      ...settings.providers
+                          .map((p) => _buildProviderCard(theme, settings, p)),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _saveAllKeys(settings),
+                          icon: const Icon(Icons.save, size: 18),
+                          label: const Text('保存所有密钥'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  _buildSubSection(
+                    theme,
+                    title: '商家选择模式',
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: const ProviderSelector(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  _buildSubSection(
+                    theme,
+                    title: '自动重试次数',
+                    children: [
+                      _buildRetryCountSection(theme, settings),
+                    ],
+                  ),
+                  _buildSubSection(
+                    theme,
+                    title: '默认生成参数',
+                    children: [
+                      _buildDefaultParamsSection(theme, settings),
+                    ],
+                  ),
+                  _buildSubSection(
+                    theme,
+                    title: '余额查询',
+                    children: [
+                      _buildBalanceSection(theme, settings),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+
+              // 一级：外观与通知
+              _buildCategory(
+                theme,
+                icon: Icons.palette,
+                title: '外观与通知',
+                children: [
+                  _buildSubSection(
+                    theme,
+                    title: '主题模式',
+                    children: [
+                      _buildThemeSection(theme, settings),
+                    ],
+                  ),
+                  _buildSubSection(
+                    theme,
+                    title: '生成状态通知',
+                    children: [
+                      _buildNotificationSection(theme, settings),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+
+              // 一级：数据管理
+              _buildCategory(
+                theme,
+                icon: Icons.storage,
+                title: '数据管理',
+                children: [
+                  _buildSubSection(
+                    theme,
+                    title: '备份管理',
+                    children: [
+                      _buildBackupSection(theme),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+
+              // 一级：关于与更新
+              _buildCategory(
+                theme,
+                icon: Icons.info,
+                title: '关于与更新',
+                children: [
+                  _buildSubSection(
+                    theme,
+                    title: '版本信息',
+                    children: [
+                      _buildAboutSection(theme),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
-
-              // 商家选择模式
-              _buildSectionHeader(theme, '商家选择'),
-              const SizedBox(height: 8),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: const ProviderSelector(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildRetryCountSection(theme, settings),
-              const SizedBox(height: 24),
-
-              // 默认生成参数
-              _buildSectionHeader(theme, '默认生成参数'),
-              const SizedBox(height: 8),
-              _buildDefaultParamsSection(theme, settings),
-              const SizedBox(height: 24),
-
-              // 余额查询
-              _buildSectionHeader(theme, '余额查询'),
-              const SizedBox(height: 8),
-              _buildBalanceSection(theme, settings),
-              const SizedBox(height: 24),
-
-              // 外观
-              _buildSectionHeader(theme, '外观'),
-              const SizedBox(height: 8),
-              _buildThemeSection(theme, settings),
-              const SizedBox(height: 24),
-
-              // 关于
-              _buildSectionHeader(theme, '关于'),
-              const SizedBox(height: 8),
-              _buildAboutSection(theme),
-              const SizedBox(height: 32),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildCategory(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    return ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      collapsedShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.dividerColor),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.dividerColor),
+      ),
+      leading: Icon(icon, color: theme.colorScheme.primary),
+      title: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      children: children,
+    );
+  }
+
+  Widget _buildSubSection(
+    ThemeData theme, {
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              title,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          ...children,
+        ],
       ),
     );
   }
@@ -138,8 +267,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 if (provider.isValid)
-                  Icon(Icons.check_circle,
-                      size: 18, color: Colors.green)
+                  Icon(Icons.check_circle, size: 18, color: Colors.green)
                 else
                   Icon(Icons.cancel,
                       size: 18,
@@ -184,13 +312,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Spacer(),
                 IconButton(
                   icon: Icon(
-                    _obscureKeys
-                        ? Icons.visibility_off
-                        : Icons.visibility,
+                    _obscureKeys ? Icons.visibility_off : Icons.visibility,
                     size: 18,
                   ),
-                  onPressed: () =>
-                      setState(() => _obscureKeys = !_obscureKeys),
+                  onPressed: () => setState(() => _obscureKeys = !_obscureKeys),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -242,41 +367,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ========== 区块标题 ==========
-  Widget _buildSectionHeader(ThemeData theme, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
   // ========== 重试次数 ==========
-  Widget _buildRetryCountSection(
-      ThemeData theme, SettingsProvider settings) {
+  Widget _buildRetryCountSection(ThemeData theme, SettingsProvider settings) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.refresh,
-                size: 20, color: theme.colorScheme.primary),
+            Icon(Icons.refresh, size: 20, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('自动模式每商家重试次数',
-                      style: theme.textTheme.bodyMedium),
+                  Text('自动模式每商家重试次数', style: theme.textTheme.bodyMedium),
                   Text(
                     '每个商家最多尝试 ${settings.autoRetryCount} 次后切换到下一个',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color:
-                          theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withOpacity(0.5),
                     ),
                   ),
                 ],
@@ -316,11 +424,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   .map(GenerationConfig.modelDisplayName)
                   .toList(),
               (val) {
-                final model = GenerationConfig.availableModels[
-                    GenerationConfig.availableModels
-                        .map(GenerationConfig.modelDisplayName)
-                        .toList()
-                        .indexOf(val)];
+                final model = GenerationConfig.availableModels[GenerationConfig
+                    .availableModels
+                    .map(GenerationConfig.modelDisplayName)
+                    .toList()
+                    .indexOf(val)];
                 settings.setDefaultModel(model);
               },
             ),
@@ -367,8 +475,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           items: values.asMap().entries.map((entry) {
             final display =
                 displayValues != null ? displayValues[entry.key] : entry.value;
-            return DropdownMenuItem(
-                value: entry.value, child: Text(display));
+            return DropdownMenuItem(value: entry.value, child: Text(display));
           }).toList(),
           onChanged: (val) {
             if (val != null) onChanged(val);
@@ -379,8 +486,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ========== 余额查询 ==========
-  Widget _buildBalanceSection(
-      ThemeData theme, SettingsProvider settings) {
+  Widget _buildBalanceSection(ThemeData theme, SettingsProvider settings) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -402,10 +508,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: (_balanceSuccess
-                          ? Colors.green
-                          : theme.colorScheme.error)
-                      .withOpacity(0.08),
+                  color:
+                      (_balanceSuccess ? Colors.green : theme.colorScheme.error)
+                          .withOpacity(0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -420,9 +525,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: settings.providers
-                  .where((p) => p.isValid)
-                  .map((provider) {
+              children:
+                  settings.providers.where((p) => p.isValid).map((provider) {
                 return ElevatedButton(
                   onPressed: _isCheckingBalance
                       ? null
@@ -434,8 +538,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_isCheckingBalance)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: LinearProgressIndicator(
-                    color: theme.colorScheme.primary),
+                child:
+                    LinearProgressIndicator(color: theme.colorScheme.primary),
               ),
           ],
         ),
@@ -444,15 +548,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ========== 主题 ==========
-  Widget _buildThemeSection(
-      ThemeData theme, SettingsProvider settings) {
+  Widget _buildThemeSection(ThemeData theme, SettingsProvider settings) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.palette,
-                size: 20, color: theme.colorScheme.primary),
+            Icon(Icons.palette, size: 20, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
             Text('主题模式', style: theme.textTheme.bodyMedium),
             const Spacer(),
@@ -475,7 +577,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _exportBackup() async {
+    try {
+      final storage = context.read<StorageService>();
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/image_history_backup.json');
+      await file.writeAsString(await storage.exportBackupJson());
+      await Share.shareXFiles([XFile(file.path)], text: 'AI 图片生成器本地备份');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('导出失败: $e')));
+      }
+    }
+  }
+
+  Future<void> _importBackup() async {
+    final controller = TextEditingController();
+    final path = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('导入备份'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'JSON 文件完整路径'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('导入'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (path == null || path.isEmpty) return;
+    try {
+      final storage = context.read<StorageService>();
+      final count =
+          await storage.importBackupJson(await File(path).readAsString());
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('已导入 $count 条历史记录')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('导入失败: $e')));
+      }
+    }
+  }
+
   // ========== 关于 ==========
+  Widget _buildNotificationSection(ThemeData theme, SettingsProvider settings) {
+    return Card(
+      child: SwitchListTile(
+        secondary: Icon(Icons.notifications_outlined,
+            color: theme.colorScheme.primary),
+        title: const Text('生成状态通知'),
+        subtitle: const Text('仅控制本地生成完成和失败状态提示，不包含远程推送'),
+        value: settings.notificationsEnabled,
+        onChanged: settings.setNotificationsEnabled,
+      ),
+    );
+  }
+
+  Widget _buildBackupSection(ThemeData theme) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading:
+                Icon(Icons.backup_outlined, color: theme.colorScheme.primary),
+            title: const Text('导出本地备份'),
+            subtitle: const Text('导出历史记录及元数据 JSON，图片路径仅保留本机存在的文件'),
+            onTap: _exportBackup,
+          ),
+          ListTile(
+            leading: Icon(Icons.restore, color: theme.colorScheme.primary),
+            title: const Text('导入本地备份'),
+            subtitle: const Text('输入 JSON 文件路径后导入历史记录'),
+            onTap: _importBackup,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAboutSection(ThemeData theme) {
     return Card(
       child: Padding(
@@ -483,22 +675,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           children: [
             ListTile(
-              leading: Icon(Icons.info_outline,
-                  color: theme.colorScheme.primary),
+              leading:
+                  Icon(Icons.info_outline, color: theme.colorScheme.primary),
               title: const Text('AI 图片生成器'),
-              subtitle: const Text('v1.0.0'),
+              subtitle: FutureBuilder<PackageInfo>(
+                future: PackageInfo.fromPlatform(),
+                builder: (context, snapshot) {
+                  final version = snapshot.data?.version ?? '1.0.0';
+                  final build = snapshot.data?.buildNumber ?? '1';
+                  return Text('v$version (build $build)');
+                },
+              ),
             ),
             ListTile(
-              leading:
-                  Icon(Icons.code, color: theme.colorScheme.primary),
+              leading: Icon(Icons.code, color: theme.colorScheme.primary),
               title: const Text('支持的端点'),
-              subtitle: const Text(
-                  'Images API, Responses, Chat Completions'),
+              subtitle: const Text('Images API, Responses, Chat Completions'),
+            ),
+            const Divider(),
+            Consumer<UpdateProvider>(
+              builder: (context, updateProvider, _) {
+                return ListTile(
+                  leading: Icon(
+                    Icons.system_update,
+                    color: updateProvider.hasUpdate
+                        ? Colors.orange
+                        : theme.colorScheme.primary,
+                  ),
+                  title: Text(
+                    updateProvider.hasUpdate ? '有新版本可用' : '检查更新',
+                  ),
+                  subtitle: Text(
+                    updateProvider.status == UpdateCheckStatus.checking
+                        ? '正在检查...'
+                        : updateProvider.hasUpdate
+                            ? 'v${updateProvider.newVersion?.versionName ?? ""} ${updateProvider.newVersion?.updateTypeLabel ?? ""}'
+                            : updateProvider.status == UpdateCheckStatus.error
+                                ? '检查失败，点击重试'
+                                : '当前已是最新版本',
+                  ),
+                  trailing: updateProvider.status == UpdateCheckStatus.checking
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (updateProvider.hasUpdate)
+                              Icon(Icons.arrow_forward_ios,
+                                  size: 16, color: Colors.orange),
+                            IconButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => UpdateDiagnosticsScreen(
+                                    report: updateProvider.checkReport,
+                                    errorMessage: updateProvider.errorMessage,
+                                  ),
+                                ),
+                              ),
+                              icon: const Icon(Icons.analytics_outlined),
+                              tooltip: '查看检查详情',
+                            ),
+                          ],
+                        ),
+                  onTap: () => _handleUpdateCheck(updateProvider),
+                );
+              },
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handleUpdateCheck(UpdateProvider updateProvider) async {
+    if (updateProvider.hasUpdate && updateProvider.newVersion != null) {
+      // 已有更新，显示更新弹窗
+      if (mounted) {
+        UpdateDialog.show(context, updateProvider.newVersion!);
+      }
+    } else {
+      // 检查更新
+      await updateProvider.checkForUpdate();
+      if (mounted &&
+          updateProvider.hasUpdate &&
+          updateProvider.newVersion != null) {
+        UpdateDialog.show(context, updateProvider.newVersion!);
+      }
+    }
   }
 
   // ========== 操作方法 ==========

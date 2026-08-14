@@ -1,5 +1,13 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - toolchains/**
+    - .cargo/**
+    - .rustup/**
+    - build/**
+    - image-ai/**
+
 linter:
   rules:
     prefer_const_constructors: true
