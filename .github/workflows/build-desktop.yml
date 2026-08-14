@@ -32,7 +32,8 @@ jobs:
             arch: ARM64
             runner: windows-11-arm
             build_dir: arm64
-            flutter_arch: x64
+            flutter_arch: arm64
+            java_arch: arm64
           - platform: macos
             arch: x86-64
             runner: macos-13
@@ -52,6 +53,15 @@ jobs:
           channel: stable
           architecture: ${{ matrix.flutter_arch }}
           cache: true
+
+      - name: Verify Windows ARM64 toolchain
+        if: matrix.platform == 'windows' && matrix.arch == 'ARM64'
+        shell: pwsh
+        run: |
+          $flutterArch = flutter --version --machine | ConvertFrom-Json
+          if ($flutterArch.dartSdkArch -ne 'arm64') {
+            throw "Flutter ARM64 toolchain was not selected: $($flutterArch.dartSdkArch)"
+          }
 
       - name: Enable desktop target
         shell: bash
