@@ -5,6 +5,7 @@ class LoadingOverlay extends StatelessWidget {
   final bool isLoading;
   final String message;
   final String? subMessage;
+  final VoidCallback? onCancel;
   final Widget child;
 
   const LoadingOverlay({
@@ -12,6 +13,7 @@ class LoadingOverlay extends StatelessWidget {
     required this.isLoading,
     required this.message,
     this.subMessage,
+    this.onCancel,
     required this.child,
   });
 
@@ -58,6 +60,14 @@ class LoadingOverlay extends StatelessWidget {
                           color: theme.colorScheme.onSurface.withOpacity(0.6),
                         ),
                         textAlign: TextAlign.center,
+                      ),
+                    ],
+                    if (onCancel != null) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: onCancel,
+                        icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                        label: const Text('取消生成'),
                       ),
                     ],
                   ],

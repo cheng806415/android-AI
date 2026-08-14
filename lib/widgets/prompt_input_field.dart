@@ -5,13 +5,17 @@ class PromptInputField extends StatefulWidget {
   final String initialValue;
   final ValueChanged<String> onChanged;
   final VoidCallback? onSubmit;
+  final VoidCallback? onTemplate;
+  final VoidCallback? onPromptLibrary;
   final int maxLines;
 
   const PromptInputField({
     super.key,
     this.initialValue = '',
     required this.onChanged,
-    this.onSubmit,
+    required this.onSubmit,
+    this.onTemplate,
+    this.onPromptLibrary,
     this.maxLines = 5,
   });
 
@@ -27,6 +31,18 @@ class _PromptInputFieldState extends State<PromptInputField> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void didUpdateWidget(covariant PromptInputField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != oldWidget.initialValue &&
+        widget.initialValue != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.initialValue,
+        selection: TextSelection.collapsed(offset: widget.initialValue.length),
+      );
+    }
   }
 
   @override
@@ -65,6 +81,26 @@ class _PromptInputFieldState extends State<PromptInputField> {
                 ),
               ),
               const Spacer(),
+              if (widget.onTemplate != null)
+                TextButton.icon(
+                  onPressed: widget.onTemplate,
+                  icon: const Icon(Icons.auto_awesome, size: 16),
+                  label: const Text('模板'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              if (widget.onPromptLibrary != null)
+                TextButton.icon(
+                  onPressed: widget.onPromptLibrary,
+                  icon: const Icon(Icons.cloud_download_outlined, size: 16),
+                  label: const Text('服务器库'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
               Text(
                 '${_controller.text.length}',
                 style: theme.textTheme.labelSmall?.copyWith(

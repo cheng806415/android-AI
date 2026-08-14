@@ -8,19 +8,58 @@ class ImageGenerationResult {
   final String? error;
   final String? providerName;
 
+  /// 多图生成结果
+  final List<String> imageUrls;
+  final List<String> base64Datas;
+
   const ImageGenerationResult({
     this.imageUrl,
     this.base64Data,
     this.revisedPrompt,
     this.error,
     this.providerName,
+    this.imageUrls = const [],
+    this.base64Datas = const [],
   });
 
-  bool get isSuccess => error == null && (imageUrl != null || base64Data != null);
+  bool get isSuccess =>
+      error == null &&
+      (imageUrl != null ||
+          base64Data != null ||
+          imageUrls.isNotEmpty ||
+          base64Datas.isNotEmpty);
+
   bool get hasUrl => imageUrl != null && imageUrl!.isNotEmpty;
   bool get hasBase64 => base64Data != null && base64Data!.isNotEmpty;
 
-  factory ImageGenerationResult.fromError(String error, {String? providerName}) {
+  /// 图片总数
+  int get imageCount {
+    int count = 0;
+    if (hasUrl) count++;
+    if (hasBase64) count++;
+    count += imageUrls.length;
+    count += base64Datas.length;
+    return count;
+  }
+
+  /// 所有图片 URL 列表
+  List<String> get allImageUrls {
+    final urls = <String>[];
+    if (hasUrl) urls.add(imageUrl!);
+    urls.addAll(imageUrls);
+    return urls;
+  }
+
+  /// 所有 base64 数据列表
+  List<String> get allBase64Datas {
+    final datas = <String>[];
+    if (hasBase64) datas.add(base64Data!);
+    datas.addAll(base64Datas);
+    return datas;
+  }
+
+  factory ImageGenerationResult.fromError(String error,
+      {String? providerName}) {
     return ImageGenerationResult(error: error, providerName: providerName);
   }
 }
@@ -55,7 +94,7 @@ class ApiProvider {
     this.supportedEndpoints = const [EndpointType.imagesGenerations],
   });
 
-  bool get isValid => apiKey.isNotEmpty && apiKey.startsWith('sk-');
+  bool get isValid => apiKey.isNotEmpty && apiKey.length >= 8;
 
   /// 获取最优端点
   EndpointType get bestEndpoint {
@@ -115,9 +154,8 @@ class ApiProvider {
       baseUrl: map['baseUrl'] as String,
       apiKey: map['apiKey'] as String,
       priority: (map['priority'] as int?) ?? 0,
-      supportedEndpoints: endpoints.isEmpty
-          ? [EndpointType.imagesGenerations]
-          : endpoints,
+      supportedEndpoints:
+          endpoints.isEmpty ? [EndpointType.imagesGenerations] : endpoints,
     );
   }
 }
@@ -190,7 +228,10 @@ class ProviderDefaults {
         baseUrl: linksBaseUrl,
         apiKey: '',
         priority: 4,
-        supportedEndpoints: [EndpointType.chatCompletions],
+        supportedEndpoints: [
+          EndpointType.imagesGenerations,
+          EndpointType.chatCompletions,
+        ],
       ),
     ];
   }
