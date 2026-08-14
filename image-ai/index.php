@@ -440,7 +440,7 @@ footer p { font-size: 13px; color: var(--muted); }
       </div>
       <a class="platform-card <?= $detectedPlatform === 'windows' ? 'active' : '' ?>" href="<?= htmlspecialchars($githubReleaseUrl) ?>" target="_blank" rel="noopener">
         <h3>Windows</h3>
-        <p>x86-64（AMD64）和 ARM64（Windows on ARM）。</p>
+        <p>x86-64（AMD64）已发布；ARM64（Windows on ARM）适配中。</p>
         <span class="platform-link">GitHub Releases</span>
       </a>
       <a class="platform-card <?= $detectedPlatform === 'macos' ? 'active' : '' ?>" href="<?= htmlspecialchars($githubReleaseUrl) ?>" target="_blank" rel="noopener">
