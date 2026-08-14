@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   build:
+    if: matrix.enabled != false
     name: ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -30,10 +31,10 @@ jobs:
             flutter_arch: x64
           - platform: windows
             arch: ARM64
-            runner: windows-11-arm
+            runner: [self-hosted, Windows, ARM64]
             build_dir: arm64
             flutter_arch: arm64
-            java_arch: arm64
+            enabled: false
           - platform: macos
             arch: x86-64
             runner: macos-13
