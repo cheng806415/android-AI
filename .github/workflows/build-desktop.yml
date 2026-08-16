@@ -11,9 +11,11 @@ on:
       - 'windows/**'
       - 'macos/**'
       - '.github/workflows/build-desktop.yml'
+    tags:
+      - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -110,9 +112,27 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  windows-arm64:
-    if: ${{ false }}
-    name: windows-ARM64
-    runs-on: [self-hosted, Windows, ARM64]
+  release:
+    name: Create desktop release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
     steps:
-      - run: echo "Windows ARM64 requires a configured self-hosted ARM64 runner."
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ai-image-generator-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" release-assets/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "AI 图片生成器 2.0.0 Desktop" \
+            --notes "桌面端 2.0.0 发布\n\n- Windows x86-64（AMD64）\n- macOS Intel（x86-64）\n- macOS Apple Silicon（ARM64）\n- Windows ARM64 不提供支持\n- Linux 暂不开发"

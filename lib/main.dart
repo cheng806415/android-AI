@@ -13,12 +13,14 @@ import 'providers/history_provider.dart';
 import 'providers/log_provider.dart';
 import 'providers/task_queue_provider.dart';
 import 'providers/update_provider.dart';
-import 'screens/home_screen.dart';
+import 'providers/auth_provider.dart';
 import 'screens/settings_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/logs_screen.dart';
 import 'services/log_service.dart';
+import 'services/auth_service.dart';
 import 'models/update_info.dart';
+import 'widgets/auth_gate.dart';
 import 'widgets/update_dialog.dart';
 
 void main() async {
@@ -73,6 +75,9 @@ void main() async {
         ),
         ChangeNotifierProvider(
           create: (_) => UpdateProvider(updateService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(AuthService())..init(),
         ),
       ],
       child: const App(),
@@ -140,7 +145,7 @@ class _AppState extends State<App> {
           theme: AppTheme.lightTheme(),
           darkTheme: AppTheme.darkTheme(),
           themeMode: settings.flutterThemeMode,
-          home: const HomeScreen(),
+          home: const AuthGate(),
           routes: {
             '/settings': (context) => const SettingsScreen(),
             '/history': (context) => const HistoryScreen(),
