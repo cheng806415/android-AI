@@ -23,6 +23,8 @@ import 'models/update_info.dart';
 import 'widgets/auth_gate.dart';
 import 'widgets/update_dialog.dart';
 
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -119,13 +121,15 @@ class _AppState extends State<App> {
   }
 
   void _showUpdateDialog(VersionInfo version) {
+    final dialogContext = appNavigatorKey.currentState?.overlay?.context;
+    if (dialogContext == null) return;
+
     showDialog<bool>(
-      context: context,
+      context: dialogContext,
       barrierDismissible:
           version.updateType != UpdateType.major && !version.isForced,
       builder: (_) => UpdateDialog(versionInfo: version),
     ).then((_) {
-      // 大版本强制更新：用户关闭弹窗（通过系统返回键等）后再次弹出
       if ((version.updateType == UpdateType.major || version.isForced) &&
           mounted) {
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -140,6 +144,7 @@ class _AppState extends State<App> {
     return Consumer<SettingsProvider>(
       builder: (context, settings, _) {
         return MaterialApp(
+          navigatorKey: appNavigatorKey,
           title: 'AI 图片生成器',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme(),
